@@ -77,29 +77,4 @@ inline int32_t windowSamples(int32_t windowTimes100, int32_t sampleRate) {
 	return static_cast<int32_t>(samples);
 }
 
-/// S950/S1000-style 12-bit converter texture. The Deluge sample path uses the top bits of a 32-bit word, so a 12-bit
-/// mask clears the low 20 bits. Round before masking instead of using the stock bitwise truncation mask: that keeps
-/// positive and negative samples symmetrical and avoids adding a DC offset to quiet material.
-constexpr int32_t kQuantize12Shift = 20;
-constexpr int32_t kQuantize12Step = 1 << kQuantize12Shift;
-
-inline int32_t quantizeTo12Bits(int32_t sample) {
-	// Round symmetrically around zero so quiet negative samples don't jump to a large positive code.
-	int64_t rounded = static_cast<int64_t>(sample);
-	rounded += (rounded >= 0) ? (kQuantize12Step >> 1) : -(kQuantize12Step >> 1);
-	if (rounded > std::numeric_limits<int32_t>::max()) {
-		rounded = std::numeric_limits<int32_t>::max();
-	}
-	else if (rounded < std::numeric_limits<int32_t>::min()) {
-		rounded = std::numeric_limits<int32_t>::min();
-	}
-	return static_cast<int32_t>(rounded) & ~(kQuantize12Step - 1);
-}
-
-inline void quantizeBufferTo12Bits(int32_t* buffer, int32_t numSamples) {
-	for (int32_t i = 0; i < numSamples; i++) {
-		buffer[i] = quantizeTo12Bits(buffer[i]);
-	}
-}
-
 } // namespace deluge::dsp::timestretch::akai

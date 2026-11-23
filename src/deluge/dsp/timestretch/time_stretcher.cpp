@@ -37,6 +37,52 @@
 
 #define MEASURE_HOP_END_PERFORMANCE 0
 
+namespace {
+
+constexpr int64_t kMaxAkaiCycleLength = 1 << 20; // Keep the countdown comfortably inside int32_t
+
+struct AkaiCycleTiming {
+	int64_t cycleLength;
+	int32_t crossfadeLength;
+};
+
+// Shared by init() and hopEnd() so the very first hop uses the same grain-derived timing as every later hop. Without
+// this, short Kit slices can finish before the stock fixed 200-sample first hop and the grain knob appears to do
+// nothing.
+AkaiCycleTiming getAkaiCycleTiming(int32_t grainSamples, int32_t timeStretchRatio) {
+	int64_t const stretchDelta = static_cast<int64_t>(kMaxSampleValue) - static_cast<int64_t>(timeStretchRatio);
+	int64_t const absStretchDelta = stretchDelta < 0 ? -stretchDelta : stretchDelta;
+
+	int64_t cycleLength;
+	if (absStretchDelta == 0) {
+		cycleLength = kMaxAkaiCycleLength;
+	}
+	else {
+		// s = 1 / timeStretchRatio, so Akai's insertion interval D = L*s/(s-1) becomes L / |1 - timeStretchRatio|.
+		cycleLength = (static_cast<int64_t>(grainSamples) << 24) / absStretchDelta;
+	}
+	if (cycleLength < 64) {
+		cycleLength = 64;
+	}
+	else if (cycleLength > kMaxAkaiCycleLength) {
+		cycleLength = kMaxAkaiCycleLength;
+	}
+
+	// Up to one whole grain, like the S1000's cyclic crossfade, but never more than half the insertion interval
+	// because this TimeStretcher only tracks two play-heads at once.
+	int32_t crossfadeLength = static_cast<int32_t>(std::min<int64_t>(cycleLength / 2, grainSamples));
+	if (crossfadeLength < 16) {
+		crossfadeLength = std::min<int32_t>(16, static_cast<int32_t>(cycleLength) - 1);
+	}
+	if (crossfadeLength < 1) {
+		crossfadeLength = 1;
+	}
+
+	return {cycleLength, crossfadeLength};
+}
+
+} // namespace
+
 bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybackGuide* guide, int64_t newSamplePosBig,
                          int32_t numChannels, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
                          int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType,
@@ -146,6 +192,10 @@ bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybac
 		// time-stretching at the same time, they won't all hit the CPU with their first hop at the exact same time,
 		// which would cause a spike
 		samplesTilHopEnd = TimeStretch::kDefaultFirstHopLength + ((int8_t)getRandom255() >> 2);
+		if (this->akaiGrainMode) {
+			AkaiCycleTiming const timing = getAkaiCycleTiming(akaiGrainSamples, timeStretchRatio);
+			samplesTilHopEnd = static_cast<int32_t>(timing.cycleLength - timing.crossfadeLength);
+		}
 
 		crossfadeProgress = kMaxSampleValue;
 		crossfadeIncrement = 0;
@@ -536,6 +586,20 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 	auto [minBeamWidth, maxBeamWidth, crossfadeProportional, crossfadeAbsolute, randomElement] =
 	    getHopParams(timeStretchRatio);
 
+	// Looping clips (including AudioClips) keep Deluge's stock pre-margin handling, so the dedicated Akai hop below
+	// is skipped for them. Override the WSOLA hop parameters with the grain-controlled values here instead. This runs
+	// on every hop, so changing the grain-window knob immediately changes the next cycle and crossfade length.
+	if (akaiGrainMode && loopingType == LoopType::TIMESTRETCHER_LEVEL_IF_ACTIVE) {
+		akaiGrainSamples =
+		    deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100, sample->sampleRate);
+		int32_t grainSamples = akaiGrainSamples;
+		minBeamWidth = grainSamples;
+		maxBeamWidth = grainSamples;
+		crossfadeProportional = 0;
+		crossfadeAbsolute = grainSamples / 8; // Multiplied by 4 below, giving a half-grain crossfade
+		randomElement = 0;
+	}
+
 	//	D_PRINTLN("maxBeamWidth:  %d", maxBeamWidth);
 
 	/*
@@ -586,30 +650,10 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 			return true;
 		}
 
-		int64_t absStretchDelta = stretchDelta < 0 ? -stretchDelta : stretchDelta;
+		AkaiCycleTiming const timing = getAkaiCycleTiming(grainSamples, timeStretchRatio);
 
-		// s = 1 / timeStretchRatio, so Akai's insertion interval D = L*s/(s-1) becomes L / |1 - timeStretchRatio|.
-		int64_t cycleLength = (static_cast<int64_t>(grainSamples) << 24) / absStretchDelta;
-		constexpr int64_t kMaxAkaiCycleLength = 1 << 20; // Keep the countdown comfortably inside int32_t
-		if (cycleLength < 64) {
-			cycleLength = 64;
-		}
-		else if (cycleLength > kMaxAkaiCycleLength) {
-			cycleLength = kMaxAkaiCycleLength;
-		}
-
-		// Up to one whole grain, like the S1000's cyclic crossfade, but never more than half the insertion interval
-		// because this TimeStretcher only tracks two play-heads at once.
-		int32_t crossfadeLength = static_cast<int32_t>(std::min<int64_t>(cycleLength / 2, grainSamples));
-		if (crossfadeLength < 16) {
-			crossfadeLength = std::min<int32_t>(16, static_cast<int32_t>(cycleLength) - 1);
-		}
-		if (crossfadeLength < 1) {
-			crossfadeLength = 1;
-		}
-
-		samplesTilHopEnd = static_cast<int32_t>(cycleLength) - crossfadeLength;
-		crossfadeIncrement = static_cast<uint32_t>(kMaxSampleValue) / static_cast<uint32_t>(crossfadeLength);
+		samplesTilHopEnd = static_cast<int32_t>(timing.cycleLength - timing.crossfadeLength);
+		crossfadeIncrement = static_cast<uint32_t>(kMaxSampleValue) / static_cast<uint32_t>(timing.crossfadeLength);
 		crossfadeProgress = 0;
 
 		// Slowing down (ratio < 1) jumps the read position back by one grain; speeding up jumps it forward.

@@ -16,7 +16,7 @@ The stock Deluge workflow is preserved:
 
 * Sample sources using **LINKED** pitch/speed keep the stock Deluge stretcher, decimation, and BITCRUSH behavior exactly as before.
 * Sample sources using **Independent** pitch/speed, or **STRETCH** repeat mode, use the Akai engine when time stretching is actually active.
-* The Akai engine applies a symmetric 12-bit quantization mask to the isolated stretched voice, giving pitched-down and time-stretched loops a converter-style texture.
+* The Akai engine uses fixed grain cycles with cyclic crossfades; it does not apply extra bit reduction to the stretched sound.
 
 ### Global engine switch
 
@@ -25,7 +25,7 @@ Choose the time-stretch engine globally in:
 **SHIFT + SELECT-encoder → Community Features → Time Stretch Engine**
 
 * OLED: `Time Stretch Engine`; 7SEG: `TSTR`
-* `Akai` / `AKAI` — Akai grain engine with 12-bit texture. This is the default in this fork.
+* `Akai` / `AKAI` — Akai grain engine. This is the default in this fork.
 * `Deluge` / `DLG` — stock Community Firmware 1.3 time stretcher.
 
 Setting the engine to **Deluge** restores the stock 1.3 time-stretch and BITCRUSH behavior.
