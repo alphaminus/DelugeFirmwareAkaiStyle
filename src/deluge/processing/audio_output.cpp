@@ -24,6 +24,7 @@
 #include "memory/general_memory_allocator.h"
 #include "model/clip/audio_clip.h"
 #include "model/model_stack.h"
+#include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "modulation/params/param_manager.h"
 #include "playback/mode/arrangement.h"
@@ -92,6 +93,9 @@ void AudioOutput::cloneFrom(ModControllableAudio* other) {
 }
 
 bool AudioOutput::isAkaiGrainModeActive() const {
+	if (!runtimeFeatureSettings.isAkaiTimeStretchEnabled()) {
+		return false;
+	}
 	auto* clip = static_cast<AudioClip*>(activeClip);
 	return clip != nullptr && clip->sampleControls.pitchAndSpeedAreIndependent;
 }

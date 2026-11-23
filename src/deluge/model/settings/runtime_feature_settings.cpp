@@ -217,6 +217,18 @@ void RuntimeFeatureSettings::init() {
 	    {l10n::getView(STRING_FOR_SHORTCUT_OVERLAY_MENU_AND_CLIP),
 	     static_cast<uint32_t>(RuntimeFeatureStateShortcutOverlay::MenuAndClip)},
 	};
+
+	// Time-stretch engine — defaults to Akai so this fork's current sound is unchanged.
+	auto& engine = settings[RuntimeFeatureSettingType::TimeStretchEngine];
+	engine.displayName = STRING_FOR_COMMUNITY_FEATURE_TIME_STRETCH_ENGINE;
+	engine.xmlName = "timeStretchEngine";
+	engine.value = static_cast<uint32_t>(RuntimeFeatureStateTimeStretchEngine::TimeStretchAkai);
+	engine.options = {
+	    {l10n::getView(STRING_FOR_TIME_STRETCH_ENGINE_DELUGE),
+	     static_cast<uint32_t>(RuntimeFeatureStateTimeStretchEngine::TimeStretchDeluge)},
+	    {l10n::getView(STRING_FOR_TIME_STRETCH_ENGINE_AKAI),
+	     static_cast<uint32_t>(RuntimeFeatureStateTimeStretchEngine::TimeStretchAkai)},
+	};
 }
 
 void RuntimeFeatureSettings::factoryReset(bool showPopup) {

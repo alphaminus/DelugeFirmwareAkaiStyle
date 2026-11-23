@@ -31,6 +31,7 @@
 #include "model/sample/sample.h"
 #include "model/sample/sample_cache.h"
 #include "model/sample/sample_holder_for_voice.h"
+#include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "model/voice/voice_sample.h"
 #include "modulation/params/param_set.h"
@@ -2082,7 +2083,8 @@ pitchTooHigh:
 				goto instantUnassign;
 			}
 
-			bool akaiGrainMode = sound.sources[s].oscType == OscType::SAMPLE
+			bool akaiGrainMode = runtimeFeatureSettings.isAkaiTimeStretchEnabled()
+			                     && sound.sources[s].oscType == OscType::SAMPLE
 			                     && (sound.sources[s].sampleControls.pitchAndSpeedAreIndependent
 			                         || sound.sources[s].repeatMode == SampleRepeatMode::STRETCH)
 			                     && timeStretchRatio != kMaxSampleValue;

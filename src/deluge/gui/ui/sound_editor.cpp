@@ -451,6 +451,9 @@ bool SoundEditor::editingGateDrumRow() {
 
 // The BITCRUSH shortcut is repurposed for the Akai grain window while a sample is in an independent-pitch mode.
 static bool bitcrushShortcutControlsAkaiGrain() {
+	if (!runtimeFeatureSettings.isAkaiTimeStretchEnabled()) {
+		return false;
+	}
 	if (getCurrentOutputType() == OutputType::AUDIO) {
 		AudioClip* clip = getCurrentAudioClip();
 		return clip != nullptr && clip->sampleControls.pitchAndSpeedAreIndependent;

@@ -44,6 +44,8 @@ enum RuntimeFeatureStateEmulatedDisplay : uint32_t { Hardware = 0, Toggle = 1, O
 // Keep the former On value as MenuOnly to preserve existing settings.
 enum class RuntimeFeatureStateShortcutOverlay : uint32_t { Off = 0, MenuOnly = 1, MenuAndClip = 2 };
 
+enum RuntimeFeatureStateTimeStretchEngine : uint32_t { TimeStretchDeluge = 0, TimeStretchAkai = 1 };
+
 /// Every setting needs to be declared in here
 enum RuntimeFeatureSettingType : uint32_t {
 	DrumRandomizer,
@@ -71,6 +73,7 @@ enum RuntimeFeatureSettingType : uint32_t {
 	ShowBatteryLevel,
 	RoundedCorners,
 	ShortcutOverlay,
+	TimeStretchEngine,
 	MaxElement // Keep as boundary
 };
 
@@ -100,6 +103,10 @@ public:
 	// Traded type safety for option values for code simplicity and size, use enum from above to compare
 	inline uint32_t get(RuntimeFeatureSettingType type) { return settings[type].value; };
 	inline bool isOn(RuntimeFeatureSettingType type) { return get(type) == RuntimeFeatureStateToggle::On; }
+	inline bool isAkaiTimeStretchEnabled() {
+		return get(RuntimeFeatureSettingType::TimeStretchEngine)
+		       == RuntimeFeatureStateTimeStretchEngine::TimeStretchAkai;
+	}
 
 	/**
 	 * Set a runtime feature setting.

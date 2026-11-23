@@ -30,6 +30,7 @@
 #include "model/model_stack.h"
 #include "model/sample/sample.h"
 #include "model/sample/sample_recorder.h"
+#include "model/settings/runtime_feature_settings.h"
 #include "model/song/song.h"
 #include "model/voice/voice_sample.h"
 #include "modulation/params/param_set.h"
@@ -680,7 +681,8 @@ justDontTimeStretch:
 		}
 	}
 
-	bool akaiGrainMode = sampleControls.pitchAndSpeedAreIndependent && timeStretchRatio != kMaxSampleValue;
+	bool akaiGrainMode = runtimeFeatureSettings.isAkaiTimeStretchEnabled() && sampleControls.pitchAndSpeedAreIndependent
+	                     && timeStretchRatio != kMaxSampleValue;
 	AudioEngine::akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::paramToWindowTimes100(
 	    paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_AKAI_GRAIN));
 

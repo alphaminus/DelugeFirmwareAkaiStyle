@@ -2416,7 +2416,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 
 	// Set up the Akai grain window before any Voices in this Sound start / hop. Any sample source in an independent
 	// mode claims the BITCRUSH knob for grain length, so decimation stays off even when the stretch ratio is neutral.
-	akaiGrainModeActiveThisRender = isAkaiGrainModeSelected();
+	akaiGrainModeActiveThisRender = isAkaiGrainModeSelected() && runtimeFeatureSettings.isAkaiTimeStretchEnabled();
 	AudioEngine::akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::paramToWindowTimes100(
 	    paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_AKAI_GRAIN));
 
@@ -4530,7 +4530,8 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 
 		// BITCRUSH shortcut knob: in the Akai sample modes it controls the grain window instead. The real bitcrush
 		// param keeps its saved value and is used again as soon as the sample is LINKED.
-		if (modKnobMode == 7 && whichModEncoder == 0 && isAkaiGrainModeSelected()) {
+		if (modKnobMode == 7 && whichModEncoder == 0 && isAkaiGrainModeSelected()
+		    && runtimeFeatureSettings.isAkaiTimeStretchEnabled()) {
 			p = params::UNPATCHED_START + params::UNPATCHED_AKAI_GRAIN;
 		}
 

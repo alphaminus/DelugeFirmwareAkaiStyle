@@ -17,6 +17,7 @@
 
 #include "model/voice/voice_sample.h"
 #include "definitions_cxx.hpp"
+#include "dsp/timestretch/akai_grain.h"
 #include "dsp/timestretch/time_stretcher.h"
 #include "io/debug/log.h"
 #include "memory/general_memory_allocator.h"
@@ -1158,19 +1159,29 @@ readNonTimestretched:
 
 			int32_t* const tempBuffer = spareRenderingBuffer[1];
 
-			if (cache) { // If writing cache...
+			// Akai mode renders through the spare buffer even without a cache. That gives us an isolated copy of this
+			// voice's stretched output, where the 12-bit converter mask can be applied before it is mixed into the
+			// shared output buffer (which may already contain other voices).
+			if (cache || timeStretcher->akaiGrainMode) { // If writing cache, or isolating the Akai-stretched voice...
 
 				// Because we're writing cache, and if both play-heads have finished up, clearing that cache is all
 				// that's actually required!
 				if (!timeStretcher->playHeadStillActive[PLAY_HEAD_OLDER]
 				    && !timeStretcher->playHeadStillActive[PLAY_HEAD_NEWER]) {
 
-					memset(cacheWritePos, 0, numSamplesThisUncachedRead * kCacheByteDepth * sampleSourceNumChannels);
+					if (cache) {
+						memset(cacheWritePos, 0,
+						       numSamplesThisUncachedRead * kCacheByteDepth * sampleSourceNumChannels);
 
-					cacheBytePos += numSamplesThisUncachedRead * kCacheByteDepth * sampleSourceNumChannels;
-					cache->writeBytePos = cacheBytePos; // These two were and are now still the same
+						cacheBytePos += numSamplesThisUncachedRead * kCacheByteDepth * sampleSourceNumChannels;
+						cache->writeBytePos = cacheBytePos; // These two were and are now still the same
 
-					goto finishedTimestretchedRead;
+						goto finishedTimestretchedRead;
+					}
+
+					// No cache: keep going with a silent isolated buffer so the usual inactive-play-head exit is
+					// still reached below.
+					memset(tempBuffer, 0, numSamplesThisUncachedRead * 4 * sampleSourceNumChannels);
 				}
 
 				timeStretchResultWritePos = tempBuffer;
@@ -1274,9 +1285,9 @@ readTimestretched:
 
 			int32_t preCacheAmplitude, preCacheAmplitudeIncrement;
 
-			// If there's a cache, we don't want the per-play-head functions to apply the overall voice amplitude
-			// envelope - we'll do that at the end when we copy from the cache into the output buffer
-			if (cache) {
+			// If there's a cache, or we're isolating an Akai-stretched voice, we don't want the per-play-head
+			// functions to apply the overall voice amplitude envelope - we'll do that when we mix the buffer out.
+			if (cache || timeStretcher->akaiGrainMode) {
 				preCacheAmplitude = 2147483647;
 				preCacheAmplitudeIncrement = 0;
 			}
@@ -1430,6 +1441,13 @@ readOlderHeadUnbuffered:
 
 headsFinishedReading:
 
+			// Both crossfaded play-heads have now been summed into the isolated buffer, so this is the combined
+			// stretched signal. Quantize it here rather than in the shared output buffer.
+			if (timeStretcher->akaiGrainMode) {
+				deluge::dsp::timestretch::akai::quantizeBufferTo12Bits(tempBuffer, numSamplesThisUncachedReadUntouched
+				                                                                       * sampleSourceNumChannels);
+			}
+
 			timeStretcher->samplePosBig += (int64_t)combinedIncrement * numSamplesThisTimestretchedRead * playDirection;
 
 #if TIME_STRETCH_ENABLE_BUFFER
@@ -1468,7 +1486,7 @@ headsFinishedReading:
 
 			timeStretcher->samplesTilHopEnd -= numSamplesThisTimestretchedRead;
 
-			if (!cache) {
+			if (!cache && !timeStretcher->akaiGrainMode) {
 				amplitude += amplitudeIncrement * numSamplesThisTimestretchedRead;
 			}
 
@@ -1570,6 +1588,51 @@ headsFinishedReading:
 
 					cacheBytePos += numSamplesThisUncachedReadUntouched * kCacheByteDepth * sampleSourceNumChannels;
 					cache->writeBytePos = cacheBytePos; // These two were and are now still the same
+				}
+			}
+
+			// Otherwise, if we isolated an Akai-stretched voice, mix the quantized buffer into the output.
+			else if (timeStretcher->akaiGrainMode) {
+				int32_t* __restrict__ tempBufferReadPos = tempBuffer;
+
+				int32_t sampleRead[2];
+				sampleRead[0] = *tempBufferReadPos++;
+				int32_t existingValueL = *outputBufferWritePos;
+
+				int32_t const* const outputBufferEndNow =
+				    outputBufferWritePos + numSamplesThisUncachedReadUntouched * numChannelsInOutputBuffer;
+
+				while (true) {
+					amplitude += amplitudeIncrement;
+
+					if (sampleSourceNumChannels == 2) {
+						sampleRead[1] = *tempBufferReadPos++;
+
+						// If condensing to mono, do that now
+						if (numChannelsInOutputBuffer == 1) {
+							sampleRead[0] = ((sampleRead[0] >> 1) + (sampleRead[1] >> 1));
+						}
+					}
+
+					// Mono / left channel (or stereo condensed to mono)
+					*outputBufferWritePos = multiply_accumulate_32x32_rshift32_rounded(
+					    existingValueL, sampleRead[0], amplitude); // amplitude is modified above
+					outputBufferWritePos++;
+
+					// Right channel
+					if (numChannelsInOutputBuffer == 2) {
+						int32_t existingValueR = *outputBufferWritePos;
+						*outputBufferWritePos =
+						    multiply_accumulate_32x32_rshift32_rounded(existingValueR, sampleRead[1], amplitude);
+						outputBufferWritePos++;
+					}
+
+					if (outputBufferWritePos == outputBufferEndNow) {
+						break;
+					}
+
+					sampleRead[0] = *tempBufferReadPos++;
+					existingValueL = *outputBufferWritePos;
 				}
 			}
 
