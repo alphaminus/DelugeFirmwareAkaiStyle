@@ -40,6 +40,8 @@ public:
 	~AudioOutput() override;
 	void cloneFrom(ModControllableAudio* other) override;
 
+	[[nodiscard]] bool isAkaiGrainModeActive() const override;
+
 	void renderOutput(ModelStack* modelStack, std::span<StereoSample> buffer, int32_t* reverbBuffer,
 	                  int32_t reverbAmountAdjust, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
 	                  bool isClipActive) override;

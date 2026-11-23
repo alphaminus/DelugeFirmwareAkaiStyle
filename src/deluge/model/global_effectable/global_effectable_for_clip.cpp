@@ -155,7 +155,8 @@ GlobalEffectableForClip::GlobalEffectableForClip() {
 		processFilters(global_effectable_audio);
 
 		// Render FX
-		processSRRAndBitcrushing(global_effectable_audio, &volumePostFX, paramManagerForClip);
+		processSRRAndBitcrushing(global_effectable_audio, &volumePostFX, paramManagerForClip,
+		                         isAkaiGrainModeActive());
 	}
 
 	processFXForGlobalEffectable(global_effectable_audio, &volumePostFX, paramManagerForClip, delayWorkingState,
@@ -296,6 +297,9 @@ int32_t GlobalEffectableForClip::getParameterFromKnob(int32_t whichModEncoder) {
 	}
 	else if (modKnobMode == 6 && !whichModEncoder) {
 		return params::UNPATCHED_PITCH_ADJUST;
+	}
+	else if (modKnobMode == 7 && !whichModEncoder && isAkaiGrainModeActive()) {
+		return params::UNPATCHED_AKAI_GRAIN;
 	}
 
 	return GlobalEffectable::getParameterFromKnob(whichModEncoder);
