@@ -91,6 +91,10 @@ public:
 
 	Source sources[kNumSources];
 
+	/// Set by Voices while they render, so Sound::render() can bypass decimation while any Akai-style grain playback
+	/// is active. Reset at the start of every render.
+	bool akaiGrainModeActiveThisRender = false;
+
 	// This is for the *global* params only, and begins with FIRST_GLOBAL_PARAM, so subtract that from your p value
 	// before accessing this array!
 	std::array<int32_t, deluge::modulation::params::kNumParams - deluge::modulation::params::FIRST_GLOBAL>
@@ -274,6 +278,8 @@ public:
 	// void channelAftertouchReceivedFromInputMIDIChannel(int32_t newValue);
 	ModelStackWithAutoParam* getParamFromModEncoder(int32_t whichModEncoder, ModelStackWithThreeMainThings* modelStack,
 	                                                bool allowCreation = true) final;
+	/// True when at least one sample source is in the mode that repurposes the BITCRUSH knob for grain length.
+	[[nodiscard]] bool isAkaiGrainModeSelected() const;
 	void reassessRenderSkippingStatus(ModelStackWithSoundFlags* modelStack, bool shouldJustCutModFX = false);
 	void getThingWithMostReverb(Sound** soundWithMostReverb, ParamManager** paramManagerWithMostReverb,
 	                            GlobalEffectableForClip** globalEffectableWithMostReverb,

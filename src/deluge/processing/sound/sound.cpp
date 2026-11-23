@@ -18,6 +18,7 @@
 #include "processing/sound/sound.h"
 #include "definitions_cxx.hpp"
 #include "dsp/dx/engine.h"
+#include "dsp/timestretch/akai_grain.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/root_ui.h"
 #include "gui/ui/sound_editor.h"
@@ -2413,6 +2414,12 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
 
+	// Set up the Akai grain window before any Voices in this Sound start / hop. Voices set
+	// akaiGrainModeActiveThisRender while rendering so we can skip decimation below.
+	akaiGrainModeActiveThisRender = false;
+	AudioEngine::akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::paramToWindowTimes100(
+	    paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_AKAI_GRAIN));
+
 	// Do global LFO
 	if (paramManager->getPatchCableSet()->isSourcePatchedToSomething(PatchSource::LFO_GLOBAL_1)) {
 		const auto patchSourceLFOGlobalUnderlying = util::to_underlying(PatchSource::LFO_GLOBAL_1);
@@ -2623,7 +2630,7 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 	int32_t modFXDepth = paramFinalValues[params::GLOBAL_MOD_FX_DEPTH - params::FIRST_GLOBAL];
 	int32_t modFXRate = paramFinalValues[params::GLOBAL_MOD_FX_RATE - params::FIRST_GLOBAL];
 
-	processSRRAndBitcrushing(sound_stereo, &postFXVolume, paramManager);
+	processSRRAndBitcrushing(sound_stereo, &postFXVolume, paramManager, akaiGrainModeActiveThisRender);
 	processFX(sound_stereo, modFXType_, modFXRate, modFXDepth, delayWorkingState, &postFXVolume, paramManager,
 	          !voices_.empty(), reverbSendAmount >> 1);
 	processStutter(sound_stereo, paramManager);
@@ -4495,6 +4502,18 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoder(int32_t whichModEncoder,
 	return getParamFromModEncoderDeeper(whichModEncoder, modelStack, allowCreation);
 }
 
+bool Sound::isAkaiGrainModeSelected() const {
+	for (int32_t s = 0; s < kNumSources; s++) {
+		const Source& source = sources[s];
+		if (source.oscType == OscType::SAMPLE
+		    && (source.sampleControls.pitchAndSpeedAreIndependent
+		        || source.repeatMode == SampleRepeatMode::STRETCH)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEncoder,
                                                              ModelStackWithThreeMainThings* modelStack,
                                                              bool allowCreation) {
@@ -4509,6 +4528,12 @@ ModelStackWithAutoParam* Sound::getParamFromModEncoderDeeper(int32_t whichModEnc
 
 	if (knob->paramDescriptor.isJustAParam()) {
 		int32_t p = knob->paramDescriptor.getJustTheParam();
+
+		// BITCRUSH shortcut knob: in the Akai sample modes it controls the grain window instead. The real bitcrush
+		// param keeps its saved value and is used again as soon as the sample is LINKED.
+		if (modKnobMode == 7 && whichModEncoder == 0 && isAkaiGrainModeSelected()) {
+			p = params::UNPATCHED_START + params::UNPATCHED_AKAI_GRAIN;
+		}
 
 		// Unpatched param
 		if (p >= params::UNPATCHED_START) {

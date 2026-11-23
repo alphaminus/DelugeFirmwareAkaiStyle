@@ -2082,6 +2082,14 @@ pitchTooHigh:
 				goto instantUnassign;
 			}
 
+			bool akaiGrainMode = sound.sources[s].oscType == OscType::SAMPLE
+			                     && (sound.sources[s].sampleControls.pitchAndSpeedAreIndependent
+			                         || sound.sources[s].repeatMode == SampleRepeatMode::STRETCH)
+			                     && timeStretchRatio != kMaxSampleValue;
+			if (akaiGrainMode) {
+				sound.akaiGrainModeActiveThisRender = true;
+			}
+
 			// If user unmuted mid-note...
 			bool tryToStartMidNote = voiceSample->pendingSamplesLate;
 			if (tryToStartMidNote) [[unlikely]] {
@@ -2235,7 +2243,7 @@ dontUseCache: {}
 			bool stillActive = voiceSample->render(
 			    &guides[s], renderBuffer, numSamples, sample, numChannels, loopingType, phaseIncrement,
 			    timeStretchRatio, sourceAmplitude, amplitudeIncrement, interpolationBufferSize,
-			    sound.sources[s].sampleControls.interpolationMode, getPriorityRating());
+			    sound.sources[s].sampleControls.interpolationMode, getPriorityRating(), akaiGrainMode);
 
 			if (stereoUnison) {
 				if (numChannels == 2) {
