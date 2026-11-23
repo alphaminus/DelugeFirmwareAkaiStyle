@@ -60,7 +60,7 @@ public:
 	bool render(SamplePlaybackGuide* guide, int32_t* oscBuffer, int32_t numSamples, Sample* sample, int32_t numChannels,
 	            LoopType loopingType, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t amplitude,
 	            int32_t amplitudeIncrement, int32_t bufferSize, InterpolationMode desiredInterpolationMode,
-	            int32_t priorityRating);
+	            int32_t priorityRating, bool akaiGrainMode = false);
 	void beenUnassigned(bool wontBeUsedAgain);
 
 	// AudioClips don't obey markers because they "fudge" instead.
@@ -98,7 +98,7 @@ public:
 private:
 	bool weShouldBeTimeStretchingNow(Sample* sample, SamplePlaybackGuide* guide, int32_t numSamples,
 	                                 int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-	                                 int32_t priorityRating, LoopType loopingType);
+	                                 int32_t priorityRating, LoopType loopingType, bool akaiGrainMode);
 	void switchToReadingCacheFromWriting();
 	bool stopReadingFromCache();
 
