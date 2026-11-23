@@ -81,6 +81,9 @@ protected:
 		std::optional<int32_t> pitch_;
 	};
 
+	/// Whether this output's active sample is in the mode that repurposes BITCRUSH for the Akai grain window.
+	[[nodiscard]] virtual bool isAkaiGrainModeActive() const { return false; }
+
 	int32_t getParameterFromKnob(int32_t whichModEncoder) final;
 	void renderOutput(ModelStackWithTimelineCounter* modelStack, ParamManager* paramManagerForClip,
 	                  std::span<StereoSample> output, int32_t* reverbBuffer, int32_t reverbAmountAdjust,

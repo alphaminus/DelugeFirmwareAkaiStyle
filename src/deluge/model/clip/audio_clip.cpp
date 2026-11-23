@@ -18,6 +18,7 @@
 #include "model/clip/audio_clip.h"
 #include "clip.h"
 #include "definitions_cxx.hpp"
+#include "dsp/timestretch/akai_grain.h"
 #include "dsp/timestretch/time_stretcher.h"
 #include "gui/views/automation_view.h"
 #include "gui/waveform/waveform_renderer.h"
@@ -679,6 +680,10 @@ justDontTimeStretch:
 		}
 	}
 
+	bool akaiGrainMode = sampleControls.pitchAndSpeedAreIndependent && timeStretchRatio != kMaxSampleValue;
+	AudioEngine::akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::paramToWindowTimes100(
+	    paramManager.getUnpatchedParamSet()->getValue(params::UNPATCHED_AKAI_GRAIN));
+
 	int32_t priorityRating = getClusterPriority();
 
 	bool clipWillLoopAtEnd = playbackHandler.playbackState && currentPlaybackMode->willClipLoopAtSomePoint(modelStack);
@@ -791,7 +796,7 @@ justDontTimeStretch:
 		stillActive = voiceSample->render(&guide, outputBuffer.data(), outputBuffer.size(), sample, sample->numChannels,
 		                                  loopingType, phaseIncrement, timeStretchRatio, amplitude, amplitudeIncrement,
 		                                  sampleControls.getInterpolationBufferSize(phaseIncrement),
-		                                  sampleControls.interpolationMode, priorityRating);
+		                                  sampleControls.interpolationMode, priorityRating, akaiGrainMode);
 	}
 
 	if (!stillActive) {
