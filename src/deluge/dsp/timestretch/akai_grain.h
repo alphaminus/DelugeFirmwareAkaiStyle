@@ -11,6 +11,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 
 namespace deluge::dsp::timestretch::akai {
 
@@ -45,10 +46,10 @@ constexpr int32_t paramToWindowTimes100(int32_t paramValue) {
 
 constexpr int32_t windowTimes100ToParam(int32_t windowTimes100) {
 	if (windowTimes100 <= kMinWindowTimes100) {
-		return INT32_MIN;
+		return std::numeric_limits<int32_t>::min();
 	}
 	if (windowTimes100 >= kMaxWindowTimes100) {
-		return INT32_MAX;
+		return std::numeric_limits<int32_t>::max();
 	}
 	int64_t menuValue = (static_cast<int64_t>(windowTimes100 - kMinWindowTimes100) * 50
 	                     + (kMaxWindowTimes100 - kMinWindowTimes100) / 2)

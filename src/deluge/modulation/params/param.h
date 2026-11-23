@@ -204,11 +204,8 @@ enum UnpatchedShared : ParamType {
 	UNPATCHED_ARP_SPREAD_OCTAVE,
 	UNPATCHED_SPREAD_VELOCITY,
 	UNPATCHED_LAST_ARP_PARAM,
-	/// Grain window for Akai-style playback. The BITCRUSH shortcut knob is remapped to this when a sample is
-	/// INDEPENDENT or STRETCH, leaving the real bitcrush value untouched.
-	UNPATCHED_AKAI_GRAIN,
 	/// Special value for chaining the UNPATCHED_* params
-	UNPATCHED_NUM_SHARED,
+	UNPATCHED_NUM_SHARED = UNPATCHED_LAST_ARP_PARAM,
 };
 
 /// Unpatched params which are only used for Sounds
@@ -236,6 +233,10 @@ enum UnpatchedGlobal : ParamType {
 	UNPATCHED_SIDECHAIN_VOLUME,
 	UNPATCHED_PITCH_ADJUST,
 	UNPATCHED_TEMPO,
+	/// Grain window for Akai-style playback. Appended so existing unpatched param IDs (and saved presets) keep their
+	/// meaning. The BITCRUSH shortcut knob is remapped to this while a sample is INDEPENDENT/STRETCH; the real
+	/// bitcrush value is left untouched and is restored automatically when switching back to LINKED.
+	UNPATCHED_AKAI_GRAIN,
 	UNPATCHED_GLOBAL_MAX_NUM,
 };
 

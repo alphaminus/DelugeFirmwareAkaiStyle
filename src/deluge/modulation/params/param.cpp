@@ -364,7 +364,6 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_ARP_SPREAD_GATE] = STRING_FOR_ARP_SPREAD_GATE_MENU_TITLE,
 		    [UNPATCHED_ARP_SPREAD_OCTAVE] = STRING_FOR_ARP_SPREAD_OCTAVE_MENU_TITLE,
 		    [UNPATCHED_SPREAD_VELOCITY] = STRING_FOR_SPREAD_VELOCITY_MENU_TITLE,
-		    [UNPATCHED_AKAI_GRAIN] = STRING_FOR_AKAI_GRAIN,
 		};
 		return l10n::get(NAMES[p]);
 	}
@@ -379,6 +378,11 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 	}
 
 	constexpr ParamType unc = UNPATCHED_NUM_SHARED;
+
+	// This param lives at the end of the Global range to avoid renumbering older params, but Sounds can use it too.
+	if (kind == Kind::UNPATCHED_SOUND && p == util::to_underlying(UNPATCHED_AKAI_GRAIN)) {
+		return l10n::get(STRING_FOR_AKAI_GRAIN);
+	}
 
 	if (kind == Kind::UNPATCHED_SOUND && p < util::to_underlying(UNPATCHED_SOUND_MAX_NUM)) {
 		using enum UnpatchedSound;
@@ -409,6 +413,7 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_SIDECHAIN_VOLUME - unc] = STRING_FOR_SIDECHAIN_LEVEL,
 		    [UNPATCHED_PITCH_ADJUST - unc] = STRING_FOR_MASTER_PITCH,
 		    [UNPATCHED_TEMPO - unc] = STRING_FOR_TEMPO,
+		    [UNPATCHED_AKAI_GRAIN - unc] = STRING_FOR_AKAI_GRAIN,
 		};
 		return l10n::get(NAMES[p - unc]);
 	}
@@ -486,6 +491,13 @@ bool paramNeedsLPF(ParamType p, bool fromAutomation) {
 
 constexpr char const* paramNameForFileConst(Kind const kind, ParamType const param, bool forMidiFollowFile = false) {
 	using enum Kind;
+
+	// Appended to the Global range, but also used by Sounds. Handle it before the kind-specific switches so both
+	// param kinds serialize with the same name.
+	if (param == UNPATCHED_START + UNPATCHED_AKAI_GRAIN) {
+		return "akaiGrain";
+	}
+
 	if (kind == UNPATCHED_SOUND && param >= UNPATCHED_START + UNPATCHED_NUM_SHARED) {
 		// Unpatched params just for Sounds
 		switch (static_cast<UnpatchedSound>(param - UNPATCHED_START)) {
@@ -635,9 +647,6 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_SPREAD_VELOCITY:
 			return "spreadVelocity";
-
-		case UNPATCHED_AKAI_GRAIN:
-			return "akaiGrain";
 
 		case UNPATCHED_NUM_SHARED:
 		    // Intentionally not handled

@@ -529,24 +529,8 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 		samplePos = getSamplePos(playDirection);
 	}
 
-	HopParams hopParams;
-	if (akaiGrainMode) {
-		// S950/S1000-style: a fixed cycle length, chosen by the remapped BITCRUSH knob, replaces the Deluge's
-		// adaptive beam-width / phase-correlation search. A half-grain crossfade gives the characteristic cyclic
-		// chatter at the short end and the wide smear at the long end.
-		int32_t grainSamples = deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100,
-		                                                                   sample->sampleRate);
-		hopParams.minBeamWidth = grainSamples;
-		hopParams.maxBeamWidth = grainSamples;
-		hopParams.crossfadeProportional = 0;
-		hopParams.crossfadeAbsolute = grainSamples / 8; // Multiplied by 4 below
-		hopParams.randomElement = 0;
-	}
-	else {
-		hopParams = getHopParams(timeStretchRatio);
-	}
-
-	auto [minBeamWidth, maxBeamWidth, crossfadeProportional, crossfadeAbsolute, randomElement] = hopParams;
+	auto [minBeamWidth, maxBeamWidth, crossfadeProportional, crossfadeAbsolute, randomElement] =
+	    getHopParams(timeStretchRatio);
 
 	//	D_PRINTLN("maxBeamWidth:  %d", maxBeamWidth);
 
@@ -579,6 +563,91 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 			}
 		}
 	};
+
+	// Akai-style cyclic playback. Unlike WSOLA, this deliberately does not search for a phase-matched cycle: a fixed
+	// cycle length gives the S950/S1000 character, from tight chatter to a wide smear. The BITCRUSH knob (remapped to
+	// UNPATCHED_AKAI_GRAIN) sets the cycle length in real time. Loop-boundary hops keep Deluge's stock pre-margin
+	// handling, which is why this branch is restricted to non-looping TimeStretchers.
+	if (akaiGrainMode && loopingType != LoopType::TIMESTRETCHER_LEVEL_IF_ACTIVE) {
+		int32_t grainSamples =
+		    deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100, sample->sampleRate);
+
+		int64_t stretchDelta = static_cast<int64_t>(kMaxSampleValue) - static_cast<int64_t>(timeStretchRatio);
+		if (stretchDelta == 0) {
+			// Nothing to stretch. Don't keep asking for hops.
+			samplesTilHopEnd = 2147483647;
+			crossfadeIncrement = 0;
+			crossfadeProgress = kMaxSampleValue;
+			return true;
+		}
+
+		int64_t absStretchDelta = stretchDelta < 0 ? -stretchDelta : stretchDelta;
+
+		// s = 1 / timeStretchRatio, so Akai's insertion interval D = L*s/(s-1) becomes L / |1 - timeStretchRatio|.
+		int64_t cycleLength = (static_cast<int64_t>(grainSamples) << 24) / absStretchDelta;
+		constexpr int64_t kMaxAkaiCycleLength = 1 << 20; // Keep the countdown comfortably inside int32_t
+		if (cycleLength < 64) {
+			cycleLength = 64;
+		}
+		else if (cycleLength > kMaxAkaiCycleLength) {
+			cycleLength = kMaxAkaiCycleLength;
+		}
+
+		int32_t crossfadeLength = static_cast<int32_t>(std::min<int64_t>(cycleLength / 3, grainSamples / 2));
+		if (crossfadeLength < 16) {
+			crossfadeLength = std::min<int32_t>(16, static_cast<int32_t>(cycleLength) - 1);
+		}
+		if (crossfadeLength < 1) {
+			crossfadeLength = 1;
+		}
+
+		samplesTilHopEnd = static_cast<int32_t>(cycleLength) - crossfadeLength;
+		crossfadeIncrement = static_cast<uint32_t>(kMaxSampleValue) / static_cast<uint32_t>(crossfadeLength);
+		crossfadeProgress = 0;
+
+		// Slowing down (ratio < 1) jumps the read position back by one grain; speeding up jumps it forward.
+		int32_t jumpDirection = stretchDelta > 0 ? -1 : 1;
+		int64_t newSamplePos = static_cast<int64_t>(samplePos) + static_cast<int64_t>(jumpDirection) * grainSamples * playDirection;
+
+		int32_t waveformStartSample = (playDirection == 1) ? 0 : sample->lengthInSamples - 1;
+		int32_t waveformEndSample = (playDirection == 1) ? sample->lengthInSamples : -1;
+
+		if ((newSamplePos - waveformStartSample) * playDirection < 0) {
+			newSamplePos = waveformStartSample;
+		}
+
+		newHeadBytePos = sample->audioDataStartPosBytes + static_cast<int32_t>(newSamplePos) * bytesPerSample;
+		clampToStartIfNotLoaded();
+
+		if ((newSamplePos - waveformEndSample) * playDirection >= 0) {
+			playHeadStillActive[PLAY_HEAD_NEWER] = false;
+			crossfadeIncrement = 0;
+			return true;
+		}
+
+		bool success =
+		    setupNewPlayHead(sample, voiceSample, guide, newHeadBytePos, 0, priorityRating, loopingType);
+		if (!success) {
+			// Same recovery as the stock path: put the old reader back without clobbering timeStretcher.
+			static_cast<SampleLowLevelReader&>(*voiceSample) = SampleLowLevelReader(olderPartReader, true);
+			playHeadStillActive[PLAY_HEAD_NEWER] = playHeadStillActive[PLAY_HEAD_OLDER];
+			playHeadStillActive[PLAY_HEAD_OLDER] = false;
+			crossfadeIncrement = 0;
+			samplesTilHopEnd = 500;
+		}
+		else {
+			keepClusterForHopRetry(nullptr);
+		}
+
+		if (buffer && !olderHeadReadingFromBuffer) {
+			delugeDealloc(buffer);
+			buffer = nullptr;
+		}
+
+		updateClustersForHopBack(sample, samplePos, timeStretchRatio, phaseIncrement, playDirection, priorityRating);
+		AudioEngine::logAction("/hopEnd");
+		return true;
+	}
 
 	int32_t waveformStartByte = sample->audioDataStartPosBytes;
 	if (playDirection != 1) {
@@ -677,9 +746,6 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 
 		int32_t bestBeamWidth = (minBeamWidth + maxBeamWidth) >> 1;
 
-		// Akai mode deliberately skips the percussiveness-driven beam search: a fixed cycle length is what produces
-		// the classic S-series grain artefacts.
-		if (!akaiGrainMode) {
 		int32_t beamPosAtTop = samplePos >> kPercBufferReductionMagnitude; // Pixellated
 
 		int32_t earliestPixellatedPos, latestPixellatedPos;
