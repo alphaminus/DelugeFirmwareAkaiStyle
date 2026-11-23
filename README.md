@@ -39,6 +39,8 @@ While the Akai engine is active, the normal **BITCRUSH** shortcut controls the g
 * Default: 24 ms
 * Short grains give tight cyclic chatter; long grains give a wide S1000-style smear.
 
+GRAIN can still be automated, but only through Deluge’s normal pad/note-held step automation. Turning the knob while the sequence plays is a live-only edit and is not recorded.
+
 The real BITCRUSH setting is stored separately and returns automatically when the sample is switched back to **LINKED** or the global engine is set to **Deluge**. Decimation is bypassed only while Akai mode is active.
 
 ### Shortcut pad lighting

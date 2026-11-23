@@ -265,6 +265,12 @@ constexpr ParamType kUnpatchedAndPatchedMaximum = kMaxNumUnpatchedParams + UNPAT
 
 static_assert(kMaxNumUnpatchedParams < STATIC_START, "Error: Too many UNPATCHED parameters, (collision with STATIC)");
 
+// GRAIN automation is only armed by holding a pad/note. Plain knob turns while the sequence plays must not be recorded,
+// or the grain sweep replays forever on later loops.
+constexpr bool isAkaiGrainParam(Kind kind, int32_t paramID) {
+	return (kind == Kind::UNPATCHED_SOUND || kind == Kind::UNPATCHED_GLOBAL) && paramID == UNPATCHED_AKAI_GRAIN;
+}
+
 bool isParamBipolar(Kind kind, int32_t paramID);
 bool isParamPan(Kind kind, int32_t paramID);
 bool isParamPitch(Kind kind, int32_t paramID);

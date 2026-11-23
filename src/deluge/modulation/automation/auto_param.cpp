@@ -106,15 +106,21 @@ void AutoParam::setCurrentValueInResponseToUserInput(int32_t value, ModelStackWi
 	bool automationChanged = false;
 	resetInterpolationIncrement();
 
+	bool const isAkaiGrain =
+	    deluge::modulation::params::isAkaiGrainParam(modelStack->paramCollection->getParamKind(), modelStack->paramId);
+
 	bool isPlaying =
 	    (playbackHandler.isEitherClockActive() && !playbackHandler.ticksLeftInCountIn
 	     && (!modelStack->timelineCounterIsSet() || modelStack->getTimelineCounter()->isPlayingAutomationNow()));
 
+	// GRAIN is recorded only through the note/pad-held region path (setValueForRegion()). A plain knob turn while the
+	// sequence plays is just a live sound edit; recording it would replay the same sweep on every loop. SHIFT+knob
+	// still deletes existing GRAIN automation, as it does for other params.
 	if (isPlaying) {
 
 		// If recording...
-		if (playbackHandler.recording != RecordingMode::OFF && modelStack->timelineCounterIsSet()
-		    && modelStack->getTimelineCounter()->armedForRecording) {
+		if ((!isAkaiGrain || Buttons::isShiftButtonPressed()) && playbackHandler.recording != RecordingMode::OFF
+		    && modelStack->timelineCounterIsSet() && modelStack->getTimelineCounter()->armedForRecording) {
 
 			// If in record mode and shift button held down, delete automation
 			if (Buttons::isShiftButtonPressed()) {
@@ -289,7 +295,8 @@ skipThat: {}
 		}
 	}
 
-	// If still unautomated (or not currently playing), record value change
+	// If still unautomated (or not currently playing), record value change. GRAIN live edits with existing automation
+	// don't record anything - they just temporarily override it, as for any other automated param out of record mode.
 	if (!nodes.getNumElements() || !isPlaying) {
 		if (value != currentValue) {
 			actionLogger.recordUnautomatedParamChange(modelStack);
