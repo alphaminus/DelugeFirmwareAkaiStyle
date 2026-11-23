@@ -16,9 +16,9 @@
  */
 
 #include "dsp/timestretch/time_stretcher.h"
-#include "dsp/timestretch/akai_grain.h"
 #include "definitions_cxx.hpp"
 #include "deluge/model/sample/sample_low_level_reader.h"
+#include "dsp/timestretch/akai_grain.h"
 #include "io/debug/log.h"
 #include "memory/memory_allocator_interface.h"
 #include "model/sample/sample.h"
@@ -45,6 +45,10 @@ bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybac
 	AudioEngine::logAction("TimeStretcher::init");
 
 	this->akaiGrainMode = akaiGrainMode && (fudgingNumSamplesTilLoop == 0);
+	akaiGrainSamples =
+	    this->akaiGrainMode
+	        ? deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100, sample->sampleRate)
+	        : 0;
 
 	// D_PRINTLN("TimeStretcher::init");
 
@@ -569,8 +573,9 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 	// UNPATCHED_AKAI_GRAIN) sets the cycle length in real time. Loop-boundary hops keep Deluge's stock pre-margin
 	// handling, which is why this branch is restricted to non-looping TimeStretchers.
 	if (akaiGrainMode && loopingType != LoopType::TIMESTRETCHER_LEVEL_IF_ACTIVE) {
-		int32_t grainSamples =
+		akaiGrainSamples =
 		    deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100, sample->sampleRate);
+		int32_t grainSamples = akaiGrainSamples;
 
 		int64_t stretchDelta = static_cast<int64_t>(kMaxSampleValue) - static_cast<int64_t>(timeStretchRatio);
 		if (stretchDelta == 0) {
@@ -593,7 +598,9 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 			cycleLength = kMaxAkaiCycleLength;
 		}
 
-		int32_t crossfadeLength = static_cast<int32_t>(std::min<int64_t>(cycleLength / 3, grainSamples / 2));
+		// Up to one whole grain, like the S1000's cyclic crossfade, but never more than half the insertion interval
+		// because this TimeStretcher only tracks two play-heads at once.
+		int32_t crossfadeLength = static_cast<int32_t>(std::min<int64_t>(cycleLength / 2, grainSamples));
 		if (crossfadeLength < 16) {
 			crossfadeLength = std::min<int32_t>(16, static_cast<int32_t>(cycleLength) - 1);
 		}
@@ -607,7 +614,8 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 
 		// Slowing down (ratio < 1) jumps the read position back by one grain; speeding up jumps it forward.
 		int32_t jumpDirection = stretchDelta > 0 ? -1 : 1;
-		int64_t newSamplePos = static_cast<int64_t>(samplePos) + static_cast<int64_t>(jumpDirection) * grainSamples * playDirection;
+		int64_t newSamplePos =
+		    static_cast<int64_t>(samplePos) + static_cast<int64_t>(jumpDirection) * grainSamples * playDirection;
 
 		int32_t waveformStartSample = (playDirection == 1) ? 0 : sample->lengthInSamples - 1;
 		int32_t waveformEndSample = (playDirection == 1) ? sample->lengthInSamples : -1;
@@ -625,8 +633,7 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 			return true;
 		}
 
-		bool success =
-		    setupNewPlayHead(sample, voiceSample, guide, newHeadBytePos, 0, priorityRating, loopingType);
+		bool success = setupNewPlayHead(sample, voiceSample, guide, newHeadBytePos, 0, priorityRating, loopingType);
 		if (!success) {
 			// Same recovery as the stock path: put the old reader back without clobbering timeStretcher.
 			static_cast<SampleLowLevelReader&>(*voiceSample) = SampleLowLevelReader(olderPartReader, true);
@@ -1421,6 +1428,10 @@ void TimeStretcher::updateClustersForHopBack(Sample* sample, int64_t samplePos, 
 	int64_t samplesBack = ((sample->sampleRate / 45) >> 1) + 1;
 	if (timeStretchRatio < kMaxSampleValue) {
 		samplesBack += ((int64_t)widestBeam * (kMaxSampleValue - timeStretchRatio)) >> 25;
+	}
+	if (akaiGrainMode) {
+		// Akai hops jump back by the whole grain, so keep that range queued too. The knob can change at any time.
+		samplesBack += akaiGrainSamples;
 	}
 
 	int64_t lastSample = sample->lengthInSamples - 1;

@@ -91,6 +91,11 @@ void AudioOutput::cloneFrom(ModControllableAudio* other) {
 	}
 }
 
+bool AudioOutput::isAkaiGrainModeActive() const {
+	auto* clip = static_cast<AudioClip*>(activeClip);
+	return clip != nullptr && clip->sampleControls.pitchAndSpeedAreIndependent;
+}
+
 void AudioOutput::renderOutput(ModelStack* modelStack, std::span<StereoSample> output, int32_t* reverbBuffer,
                                int32_t reverbAmountAdjust, int32_t sideChainHitPending, bool shouldLimitDelayFeedback,
                                bool isClipActive) {

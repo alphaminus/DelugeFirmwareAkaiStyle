@@ -2414,9 +2414,9 @@ void Sound::render(ModelStackWithThreeMainThings* modelStack, std::span<StereoSa
 
 	ParamManagerForTimeline* paramManager = (ParamManagerForTimeline*)modelStack->paramManager;
 
-	// Set up the Akai grain window before any Voices in this Sound start / hop. Voices set
-	// akaiGrainModeActiveThisRender while rendering so we can skip decimation below.
-	akaiGrainModeActiveThisRender = false;
+	// Set up the Akai grain window before any Voices in this Sound start / hop. Any sample source in an independent
+	// mode claims the BITCRUSH knob for grain length, so decimation stays off even when the stretch ratio is neutral.
+	akaiGrainModeActiveThisRender = isAkaiGrainModeSelected();
 	AudioEngine::akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::paramToWindowTimes100(
 	    paramManager->getUnpatchedParamSet()->getValue(params::UNPATCHED_AKAI_GRAIN));
 
@@ -4506,8 +4506,7 @@ bool Sound::isAkaiGrainModeSelected() const {
 	for (int32_t s = 0; s < kNumSources; s++) {
 		const Source& source = sources[s];
 		if (source.oscType == OscType::SAMPLE
-		    && (source.sampleControls.pitchAndSpeedAreIndependent
-		        || source.repeatMode == SampleRepeatMode::STRETCH)) {
+		    && (source.sampleControls.pitchAndSpeedAreIndependent || source.repeatMode == SampleRepeatMode::STRETCH)) {
 			return true;
 		}
 	}

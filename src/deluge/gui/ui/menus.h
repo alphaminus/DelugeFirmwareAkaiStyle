@@ -35,6 +35,7 @@ namespace deluge::gui::menu_item {
 class HorizontalMenu;
 class HorizontalMenuGroup;
 class HorizontalMenuContainer;
+class UnpatchedParam;
 } // namespace deluge::gui::menu_item
 
 extern gui::menu_item::patched_param::IntegerNonFM noiseMenu;
@@ -55,6 +56,9 @@ extern gui::menu_item::EditName drumNameEditMenu;
 extern gui::menu_item::Submenu editNameMenu;
 extern gui::menu_item::Submenu dxMenu;
 extern gui::menu_item::Submenu stemExportMenu;
+/// Shown in place of the BITCRUSH shortcut while an Akai grain-mode sample is selected.
+extern MenuItem* akaiGrainMenu;
+extern gui::menu_item::UnpatchedParam bitcrushMenu;
 extern gui::menu_item::stem_export::Start startStemExportMenu;
 
 extern gui::menu_item::firmware::Version firmwareVersionMenu;

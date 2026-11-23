@@ -449,6 +449,15 @@ bool SoundEditor::editingGateDrumRow() {
 	return selectedDrumType == DrumType::GATE;
 }
 
+// The BITCRUSH shortcut is repurposed for the Akai grain window while a sample is in an independent-pitch mode.
+static bool bitcrushShortcutControlsAkaiGrain() {
+	if (getCurrentOutputType() == OutputType::AUDIO) {
+		AudioClip* clip = getCurrentAudioClip();
+		return clip != nullptr && clip->sampleControls.pitchAndSpeedAreIndependent;
+	}
+	return soundEditor.currentSound != nullptr && soundEditor.currentSound->isAkaiGrainModeSelected();
+}
+
 void SoundEditor::setCurrentSource(int32_t sourceIndex) {
 	currentSource = &currentSound->sources[sourceIndex];
 	currentSourceIndex = sourceIndex;
@@ -1436,6 +1445,9 @@ std::tuple<MenuItem*, bool> SoundEditor::get_basic_shortcut_action(int32_t x, in
 	else if (getCurrentClip()->type == ClipType::AUDIO) {
 		if (x <= 14) {
 			item = paramShortcutsForAudioClips[x][y];
+			if (item == &bitcrushMenu && x == 6 && y == 6 && bitcrushShortcutControlsAkaiGrain()) {
+				item = akaiGrainMenu;
+			}
 		}
 	}
 	else if (editingCVOrMIDIClip() || editingNonAudioDrumRow()) {
@@ -1469,6 +1481,9 @@ std::tuple<MenuItem*, bool> SoundEditor::get_basic_shortcut_action(int32_t x, in
 	}
 	else if (not editingNothing()) {
 		item = paramShortcutsForSounds[x][y];
+		if (item == &bitcrushMenu && x == 6 && y == 6 && bitcrushShortcutControlsAkaiGrain()) {
+			item = akaiGrainMenu;
+		}
 		do_sound_checks = true;
 	}
 	return {item, do_sound_checks};
@@ -1622,6 +1637,9 @@ ActionResult SoundEditor::potentialShortcutPadAction(int32_t x, int32_t y, bool 
 				//< randomizer shortcuts
 
 				item = paramShortcutsForSounds[x][y];
+				if (item == &bitcrushMenu && x == 6 && y == 6 && bitcrushShortcutControlsAkaiGrain()) {
+					item = akaiGrainMenu;
+				}
 				if (getCurrentOutputType() == OutputType::KIT && item == &editNameMenu) {
 					item = &drumNameEditMenu;
 				}

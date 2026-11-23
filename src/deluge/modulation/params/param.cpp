@@ -562,6 +562,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 			}
 			return "pitchAdjust";
 
+		case UNPATCHED_AKAI_GRAIN:
+			return "akaiGrain";
+
 		// explicit fallthrough cases
 		case UNPATCHED_TEMPO: // nothing, really?
 		case UNPATCHED_GLOBAL_MAX_NUM:;

@@ -20,8 +20,8 @@
 #include "definitions_cxx.hpp"
 #include "deluge/dsp/granular/GranularProcessor.h"
 #include "deluge/model/settings/runtime_feature_settings.h"
-#include "dsp/timestretch/akai_grain.h"
 #include "dsp/stereo_sample.h"
+#include "dsp/timestretch/akai_grain.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/ui.h"
 #include "gui/views/automation_view.h"
@@ -581,6 +581,8 @@ void ModControllableAudio::writeParamAttributesToFile(Serializer& writer, ParamM
 	// Community Firmware parameters (always write them after the official ones, just before closing the parent tag)
 	unpatchedParams->writeParamAsAttribute(writer, "compressorThreshold", params::UNPATCHED_COMPRESSOR_THRESHOLD,
 	                                       writeAutomation, false, valuesForOverride);
+	unpatchedParams->writeParamAsAttribute(writer, "akaiGrain", params::UNPATCHED_AKAI_GRAIN, writeAutomation, false,
+	                                       valuesForOverride);
 
 	unpatchedParams->writeParamAsAttribute(writer, "arpeggiatorGate", params::UNPATCHED_ARP_GATE, writeAutomation);
 	unpatchedParams->writeParamAsAttribute(writer, "noteProbability", params::UNPATCHED_NOTE_PROBABILITY,
@@ -692,6 +694,10 @@ bool ModControllableAudio::readParamTagFromFile(Deserializer& reader, char const
 		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_COMPRESSOR_THRESHOLD,
 		                           readAutomationUpToPos);
 		reader.exitTag("compressorThreshold");
+	}
+	else if (!strcmp(tagName, "akaiGrain")) {
+		unpatchedParams->readParam(reader, unpatchedParamsSummary, params::UNPATCHED_AKAI_GRAIN, readAutomationUpToPos);
+		reader.exitTag("akaiGrain");
 	}
 
 	// Arpeggiator stuff

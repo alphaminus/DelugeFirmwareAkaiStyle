@@ -74,6 +74,8 @@ public:
 
 	/// When true, hops use a fixed Akai-style cycle length instead of the Deluge's adaptive WSOLA beam search.
 	bool akaiGrainMode = false;
+	/// Current grain / jump-back length in source samples, refreshed on every hop so the knob stays live.
+	int32_t akaiGrainSamples = 0;
 
 	uint32_t crossfadeProgress; // Out of kMaxSampleValue
 	uint32_t crossfadeIncrement;

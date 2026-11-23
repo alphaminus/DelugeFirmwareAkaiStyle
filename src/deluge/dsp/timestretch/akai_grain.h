@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 
@@ -39,9 +40,13 @@ constexpr int32_t paramToMenuValue(int32_t paramValue) {
 	return menuValue;
 }
 
+constexpr int32_t menuToWindowTimes100(int32_t menuValue) {
+	int32_t value = std::clamp<int32_t>(menuValue, 0, 50);
+	return kMinWindowTimes100 + (value * (kMaxWindowTimes100 - kMinWindowTimes100) + 25) / 50;
+}
+
 constexpr int32_t paramToWindowTimes100(int32_t paramValue) {
-	return kMinWindowTimes100
-	       + (paramToMenuValue(paramValue) * (kMaxWindowTimes100 - kMinWindowTimes100) + 25) / 50;
+	return menuToWindowTimes100(paramToMenuValue(paramValue));
 }
 
 constexpr int32_t windowTimes100ToParam(int32_t windowTimes100) {
@@ -51,9 +56,9 @@ constexpr int32_t windowTimes100ToParam(int32_t windowTimes100) {
 	if (windowTimes100 >= kMaxWindowTimes100) {
 		return std::numeric_limits<int32_t>::max();
 	}
-	int64_t menuValue = (static_cast<int64_t>(windowTimes100 - kMinWindowTimes100) * 50
-	                     + (kMaxWindowTimes100 - kMinWindowTimes100) / 2)
-	                    / (kMaxWindowTimes100 - kMinWindowTimes100);
+	int64_t menuValue =
+	    (static_cast<int64_t>(windowTimes100 - kMinWindowTimes100) * 50 + (kMaxWindowTimes100 - kMinWindowTimes100) / 2)
+	    / (kMaxWindowTimes100 - kMinWindowTimes100);
 	return static_cast<int32_t>(menuValue * 85899345 - 2147483648ll);
 }
 
