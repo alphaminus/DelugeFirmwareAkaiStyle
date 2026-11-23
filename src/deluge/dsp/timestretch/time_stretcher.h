@@ -39,7 +39,8 @@ public:
 	TimeStretcher() = default;
 	bool init(Sample* sample, VoiceSample* voiceSample, SamplePlaybackGuide* guide, int64_t newSamplePosBig,
 	          int32_t numChannels, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-	          int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType);
+	          int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType,
+	          bool akaiGrainMode = false);
 	void reInit(int64_t newSamplePosBig, SamplePlaybackGuide* guide, VoiceSample* voiceSample, Sample* sample,
 	            int32_t numChannels, int32_t timeStretchRatio, int32_t phaseIncrement, uint64_t combinedIncrement,
 	            int32_t playDirection, LoopType loopingType, int32_t priorityRating);
@@ -70,6 +71,9 @@ public:
 #endif
 
 	int64_t samplePosBig; // In whole samples including both channels. From audioDataStart. <<'d by 24
+
+	/// When true, hops use a fixed Akai-style cycle length instead of the Deluge's adaptive WSOLA beam search.
+	bool akaiGrainMode = false;
 
 	uint32_t crossfadeProgress; // Out of kMaxSampleValue
 	uint32_t crossfadeIncrement;

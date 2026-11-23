@@ -22,6 +22,7 @@
 #include "definitions_cxx.hpp"
 #include "drivers/usb/usb_audio.h"
 #include "dsp/reverb/reverb.hpp"
+#include "dsp/timestretch/akai_grain.h"
 #include "dsp/timestretch/time_stretcher.h"
 #include "extern.h"
 #include "gui/context_menu/sample_browser/kit.h"
@@ -301,6 +302,7 @@ bool lineInPluggedIn;
 InputMonitoringMode inputMonitoringMode = InputMonitoringMode::SMART;
 bool routineBeenCalled;
 uint8_t numHopsEndedThisRoutineCall;
+int32_t akaiGrainWindowTimes100 = deluge::dsp::timestretch::akai::kDefaultWindowTimes100;
 
 LiveInputBuffer* liveInputBuffers[3];
 

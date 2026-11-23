@@ -224,6 +224,9 @@ extern InputMonitoringMode inputMonitoringMode;
 extern bool audioRoutineLocked;
 extern bool routineBeenCalled;
 extern uint8_t numHopsEndedThisRoutineCall;
+/// Grain window (in hundredths of a millisecond) currently selected by the remapped BITCRUSH knob. Set by each
+/// Sound / AudioClip before its voices render so that TimeStretchers read the right value for their own hop.
+extern int32_t akaiGrainWindowTimes100;
 extern SideChain reverbSidechain;
 extern uint32_t timeThereWasLastSomeReverb;
 extern deluge::fast_vector<Sound*> sounds;

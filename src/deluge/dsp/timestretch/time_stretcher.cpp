@@ -16,6 +16,7 @@
  */
 
 #include "dsp/timestretch/time_stretcher.h"
+#include "dsp/timestretch/akai_grain.h"
 #include "definitions_cxx.hpp"
 #include "deluge/model/sample/sample_low_level_reader.h"
 #include "io/debug/log.h"
@@ -38,9 +39,12 @@
 
 bool TimeStretcher::init(Sample* sample, VoiceSample* voiceSample, SamplePlaybackGuide* guide, int64_t newSamplePosBig,
                          int32_t numChannels, int32_t phaseIncrement, int32_t timeStretchRatio, int32_t playDirection,
-                         int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType) {
+                         int32_t priorityRating, int32_t fudgingNumSamplesTilLoop, LoopType loopingType,
+                         bool akaiGrainMode) {
 
 	AudioEngine::logAction("TimeStretcher::init");
+
+	this->akaiGrainMode = akaiGrainMode && (fudgingNumSamplesTilLoop == 0);
 
 	// D_PRINTLN("TimeStretcher::init");
 
@@ -525,8 +529,24 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 		samplePos = getSamplePos(playDirection);
 	}
 
-	auto [minBeamWidth, maxBeamWidth, crossfadeProportional, crossfadeAbsolute, randomElement] =
-	    getHopParams(timeStretchRatio);
+	HopParams hopParams;
+	if (akaiGrainMode) {
+		// S950/S1000-style: a fixed cycle length, chosen by the remapped BITCRUSH knob, replaces the Deluge's
+		// adaptive beam-width / phase-correlation search. A half-grain crossfade gives the characteristic cyclic
+		// chatter at the short end and the wide smear at the long end.
+		int32_t grainSamples = deluge::dsp::timestretch::akai::windowSamples(AudioEngine::akaiGrainWindowTimes100,
+		                                                                   sample->sampleRate);
+		hopParams.minBeamWidth = grainSamples;
+		hopParams.maxBeamWidth = grainSamples;
+		hopParams.crossfadeProportional = 0;
+		hopParams.crossfadeAbsolute = grainSamples / 8; // Multiplied by 4 below
+		hopParams.randomElement = 0;
+	}
+	else {
+		hopParams = getHopParams(timeStretchRatio);
+	}
+
+	auto [minBeamWidth, maxBeamWidth, crossfadeProportional, crossfadeAbsolute, randomElement] = hopParams;
 
 	//	D_PRINTLN("maxBeamWidth:  %d", maxBeamWidth);
 
@@ -657,6 +677,9 @@ bool TimeStretcher::hopEnd(SamplePlaybackGuide* guide, VoiceSample* voiceSample,
 
 		int32_t bestBeamWidth = (minBeamWidth + maxBeamWidth) >> 1;
 
+		// Akai mode deliberately skips the percussiveness-driven beam search: a fixed cycle length is what produces
+		// the classic S-series grain artefacts.
+		if (!akaiGrainMode) {
 		int32_t beamPosAtTop = samplePos >> kPercBufferReductionMagnitude; // Pixellated
 
 		int32_t earliestPixellatedPos, latestPixellatedPos;

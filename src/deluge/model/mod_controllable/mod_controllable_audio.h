@@ -58,7 +58,8 @@ public:
 	void writeTagsToFile(Serializer& writer);
 	virtual Error readTagFromFile(Deserializer& reader, char const* tagName, ParamManagerForTimeline* paramManager,
 	                              int32_t readAutomationUpToPos, ArpeggiatorSettings* arpSettings, Song* song);
-	void processSRRAndBitcrushing(std::span<StereoSample> buffer, int32_t* postFXVolume, ParamManager* paramManager);
+	void processSRRAndBitcrushing(std::span<StereoSample> buffer, int32_t* postFXVolume, ParamManager* paramManager,
+	                              bool akaiGrainModeActive = false);
 	static void writeParamAttributesToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,
 	                                       int32_t* valuesForOverride = nullptr);
 	static void writeParamTagsToFile(Serializer& writer, ParamManager* paramManager, bool writeAutomation,

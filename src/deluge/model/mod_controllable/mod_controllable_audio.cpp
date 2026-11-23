@@ -20,6 +20,7 @@
 #include "definitions_cxx.hpp"
 #include "deluge/dsp/granular/GranularProcessor.h"
 #include "deluge/model/settings/runtime_feature_settings.h"
+#include "dsp/timestretch/akai_grain.h"
 #include "dsp/stereo_sample.h"
 #include "gui/l10n/l10n.h"
 #include "gui/ui/ui.h"
@@ -136,6 +137,9 @@ void ModControllableAudio::initParams(ParamManager* paramManager) {
 	unpatchedParams->params[params::UNPATCHED_SAMPLE_RATE_REDUCTION].setCurrentValueBasicForSetup(-2147483648);
 
 	unpatchedParams->params[params::UNPATCHED_BITCRUSHING].setCurrentValueBasicForSetup(-2147483648);
+
+	unpatchedParams->params[params::UNPATCHED_AKAI_GRAIN].setCurrentValueBasicForSetup(
+	    deluge::dsp::timestretch::akai::defaultGrainParamValue());
 
 	unpatchedParams->params[params::UNPATCHED_SIDECHAIN_SHAPE].setCurrentValueBasicForSetup(-601295438);
 	unpatchedParams->params[params::UNPATCHED_COMPRESSOR_THRESHOLD].setCurrentValueBasicForSetup(0);
@@ -330,7 +334,16 @@ bool ModControllableAudio::isSRREnabled(ParamManager* paramManager) {
 }
 
 void ModControllableAudio::processSRRAndBitcrushing(std::span<StereoSample> buffer, int32_t* postFXVolume,
-                                                    ParamManager* paramManager) {
+                                                    ParamManager* paramManager, bool akaiGrainModeActive) {
+
+	// While an Akai-style grain playback is running, the BITCRUSH shortcut knob is dedicated to the grain window.
+	// Decimation would fight the grain crossfades, so leave the output untouched and keep the SRR state clean for when
+	// the sample is switched back to LINKED.
+	if (akaiGrainModeActive) {
+		sampleRateReductionOnLastTime = false;
+		return;
+	}
+
 	uint32_t bitCrushMaskForSRR = 0xFFFFFFFF;
 
 	bool srrEnabled = isSRREnabled(paramManager);

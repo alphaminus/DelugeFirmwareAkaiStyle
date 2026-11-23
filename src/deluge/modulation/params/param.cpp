@@ -364,6 +364,7 @@ char const* getParamDisplayName(Kind kind, int32_t p) {
 		    [UNPATCHED_ARP_SPREAD_GATE] = STRING_FOR_ARP_SPREAD_GATE_MENU_TITLE,
 		    [UNPATCHED_ARP_SPREAD_OCTAVE] = STRING_FOR_ARP_SPREAD_OCTAVE_MENU_TITLE,
 		    [UNPATCHED_SPREAD_VELOCITY] = STRING_FOR_SPREAD_VELOCITY_MENU_TITLE,
+		    [UNPATCHED_AKAI_GRAIN] = STRING_FOR_AKAI_GRAIN,
 		};
 		return l10n::get(NAMES[p]);
 	}
@@ -634,6 +635,9 @@ constexpr char const* paramNameForFileConst(Kind const kind, ParamType const par
 
 		case UNPATCHED_SPREAD_VELOCITY:
 			return "spreadVelocity";
+
+		case UNPATCHED_AKAI_GRAIN:
+			return "akaiGrain";
 
 		case UNPATCHED_NUM_SHARED:
 		    // Intentionally not handled
